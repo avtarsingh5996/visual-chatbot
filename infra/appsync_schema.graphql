@@ -1,0 +1,24 @@
+type Response {
+    response: String!
+    audioUrl: String!
+    lipSync: AWSJSON!
+}
+
+type Query {
+    dummy: String
+}
+
+type Mutation {
+    publishResponse(response: String!, audioUrl: String!, lipSync: AWSJSON!): Response
+}
+
+type Subscription {
+    onResponse: Response
+    @aws_subscribe(mutations: ["publishResponse"])
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+    subscription: Subscription
+}

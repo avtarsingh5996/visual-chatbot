@@ -1,0 +1,52 @@
+{
+    "openapi": "3.0.1",
+    "info": {
+        "title": "VisualChatBotAPI",
+        "version": "1.0.0",
+        "description": "API Gateway for VisualChatBot"
+    },
+    "paths": {
+        "/chat": {
+            "post": {
+                "summary": "Handle chat requests",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "x-amazon-apigateway-integration": {
+                    "type": "aws_proxy",
+                    "httpMethod": "POST",
+                    "uri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:<YOUR_ACCOUNT_ID>:function:VisualChatBotLambda/invocations",
+                    "passthroughBehavior": "when_no_match",
+                    "timeoutInMillis": 29000
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ChatResponse": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Processing complete"
+                    }
+                }
+            }
+        }
+    },
+    "x-amazon-apigateway-cors": {
+        "allowOrigins": ["*"],
+        "allowMethods": ["POST", "OPTIONS"],
+        "allowHeaders": ["Content-Type", "Authorization"]
+    }
+}

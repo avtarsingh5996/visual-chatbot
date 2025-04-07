@@ -1,0 +1,17 @@
+VisualChatBot/
+├── backend/
+│   ├── lambda_function.py    # Lambda handler with Bedrock integration
+│   ├── lip_sync.py          # Audio analysis (same as before)
+│   ├── requirements.txt     # Dependencies
+│   ├── deploy.sh            # Deployment script
+│   └── temp/                # Temporary audio files
+├── frontend/
+│   ├── index.html           # Same as before
+│   ├── script.js            # Updated to call API Gateway
+│   ├── style.css            # Same as before
+│   └── assets/              # Same avatar images
+├── infra/
+│   ├── lambda_role.json     # IAM role for Lambda
+│   ├── api_gateway.json     # API Gateway config
+│   └── s3_bucket.json       # S3 bucket config
+└── README.md
