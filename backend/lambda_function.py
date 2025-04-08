@@ -3,6 +3,7 @@ import boto3
 import os
 from lip_sync import generate_lip_sync_data
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,7 +19,14 @@ appsync = boto3.client('appsync')
 # Configuration from environment variables
 BUCKET_NAME = 'visual-chatbot-audio'
 TABLE_NAME = 'ChatHistory'
-APPSYNC_API_ID = os.environ["APPSYNC_API_ID"]
+APPSYNC_API_ID_RAW = os.environ["APPSYNC_API_ID"]
+
+# Extract API ID from ARN if necessary
+if "arn:aws:appsync" in APPSYNC_API_ID_RAW:
+    APPSYNC_API_ID = APPSYNC_API_ID_RAW.split('/')[-1]  # Extract the ID from ARN
+else:
+    APPSYNC_API_ID = APPSYNC_API_ID_RAW
+logger.info(f"Using AppSync API ID: {APPSYNC_API_ID}")
 
 def lambda_handler(event, context):
     """
@@ -101,7 +109,7 @@ def lambda_handler(event, context):
                 'lipSync': json.dumps(lip_sync_data)
             }
         )
-        logger.info("Pushed response to AppSync")
+        logger.info(f"Pushed response to AppSync: {appsync_response}")
 
         # Clean up temporary file
         os.remove(audio_path)
@@ -121,6 +129,7 @@ def lambda_handler(event, context):
 
 if __name__ == "__main__":
     # For local testing (mock event and context)
+    os.environ["APPSYNC_API_ID"] = "test-api-id"  # Set manually for local testing
     mock_event = {
         'body': json.dumps({'message': 'Hello, how are you?'})
     }
