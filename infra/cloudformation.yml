@@ -9,8 +9,11 @@ Resources:
       Timeout: 30
       MemorySize: 1024
       Code:
-        S3Bucket: !Ref DeploymentBucket
+        S3Bucket: !Sub "visual-chatbot-deployment-${AWS::AccountId}"
         S3Key: lambda.zip
+      Environment:
+        Variables:
+          APPSYNC_API_ID: !Ref AppSyncApi
 
   LambdaRole:
     Type: AWS::IAM::Role
@@ -46,7 +49,7 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGateway
       ParentId: !GetAtt ApiGateway.RootResourceId
-      PathPart: 'chat'
+      PathPart: chat
 
   ApiGatewayMethod:
     Type: AWS::ApiGateway::Method
@@ -58,10 +61,10 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub 
-          - arn:aws:apigateway:${AWSRegion}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-          - AWSRegion: !Ref AWS::Region
-            LambdaArn: !GetAtt LambdaFunction.Arn
+        Uri: !Sub
+          - "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations"
+          - Region: !Ref AWS::Region
+            FunctionArn: !GetAtt LambdaFunction.Arn
 
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
@@ -109,26 +112,45 @@ Resources:
     Type: AWS::AppSync::GraphQLSchema
     Properties:
       ApiId: !Ref AppSyncApi
-      Definition: !Sub |
-        ${file(appsync_schema.graphql)}
+      Definition: |
+        type Response {
+          response: String!
+          audioUrl: String!
+          lipSync: AWSJSON!
+        }
+        type Query {
+          dummy: String
+        }
+        type Mutation {
+          publishResponse(response: String!, audioUrl: String!, lipSync: AWSJSON!): Response
+        }
+        type Subscription {
+          onResponse: Response
+          @aws_subscribe(mutations: ["publishResponse"])
+        }
+        schema {
+          query: Query
+          mutation: Mutation
+          subscription: Subscription
+        }
 
-  DeploymentBucket:
-    Type: AWS::S3::Bucket
+  AppSyncApiKey:
+    Type: AWS::AppSync::ApiKey
     Properties:
-      BucketName: !Sub visual-chatbot-deployment-${AWS::AccountId}
+      ApiId: !Ref AppSyncApi
 
 Outputs:
   ApiUrl:
-    Value: !Sub 
-      - https://${ApiGatewayId}.execute-api.${AWSRegion}.amazonaws.com/prod/chat
-      - ApiGatewayId: !Ref ApiGateway
-        AWSRegion: !Ref AWS::Region
+    Value: !Sub
+      - "https://${ApiId}.execute-api.${Region}.amazonaws.com/prod/chat"
+      - ApiId: !Ref ApiGateway
+        Region: !Ref AWS::Region
   FrontendUrl:
-    Value: !Sub 
-      - http://${FrontendBucketName}.s3-website-${AWSRegion}.amazonaws.com
-      - FrontendBucketName: !Ref FrontendBucket
-        AWSRegion: !Ref AWS::Region
+    Value: !Sub
+      - "http://${BucketName}.s3-website-${Region}.amazonaws.com"
+      - BucketName: !Ref FrontendBucket
+        Region: !Ref AWS::Region
   AppSyncEndpoint:
     Value: !GetAtt AppSyncApi.GraphQLUrl
   AppSyncApiKey:
-    Value: !GetAtt AppSyncApi.ApiKey
+    Value: !Ref AppSyncApiKey
