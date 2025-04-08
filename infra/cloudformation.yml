@@ -58,7 +58,10 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations
+        Uri: !Sub 
+          - arn:aws:apigateway:${AWSRegion}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - AWSRegion: !Ref AWS::Region
+            LambdaArn: !GetAtt LambdaFunction.Arn
 
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
@@ -116,9 +119,15 @@ Resources:
 
 Outputs:
   ApiUrl:
-    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/chat
+    Value: !Sub 
+      - https://${ApiGatewayId}.execute-api.${AWSRegion}.amazonaws.com/prod/chat
+      - ApiGatewayId: !Ref ApiGateway
+        AWSRegion: !Ref AWS::Region
   FrontendUrl:
-    Value: !Sub http://${FrontendBucket}.s3-website-${AWS::Region}.amazonaws.com
+    Value: !Sub 
+      - http://${FrontendBucketName}.s3-website-${AWSRegion}.amazonaws.com
+      - FrontendBucketName: !Ref FrontendBucket
+        AWSRegion: !Ref AWS::Region
   AppSyncEndpoint:
     Value: !GetAtt AppSyncApi.GraphQLUrl
   AppSyncApiKey:
