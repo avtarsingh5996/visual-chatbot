@@ -9,7 +9,7 @@ import time
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# AWS clients (region set to ap-south-1 to match your deployment)
+# AWS clients (region set to ap-south-1)
 bedrock = boto3.client('bedrock-runtime', region_name='ap-south-1')
 polly = boto3.client('polly', region_name='ap-south-1')
 s3 = boto3.client('s3', region_name='ap-south-1')
@@ -31,6 +31,9 @@ logger.info(f"Parsed APPSYNC_API_ID: {APPSYNC_API_ID}")
 
 def lambda_handler(event, context):
     try:
+        # Log the entire event for debugging
+        logger.info(f"Received event: {json.dumps(event)}")
+
         # Parse user input from API Gateway event
         body = json.loads(event['body'])
         user_input = body.get('message')
@@ -100,13 +103,19 @@ def lambda_handler(event, context):
         }
         logger.info(f"Executing AppSync mutation with API ID: {APPSYNC_API_ID}")
         logger.debug(f"Mutation query: {mutation_query}")
-        logger.debug(f"Variables: {variables}")
-        appsync_response = appsync.graphql(
-            apiId=APPSYNC_API_ID,
-            query=mutation_query,
-            variables=variables
-        )
-        logger.info(f"AppSync response: {appsync_response}")
+        logger.debug(f"Variables: {json.dumps(variables)}")
+        
+        # Test AppSync call with explicit error handling
+        try:
+            appsync_response = appsync.graphql(
+                apiId=APPSYNC_API_ID,
+                query=mutation_query,
+                variables=variables
+            )
+            logger.info(f"AppSync response: {json.dumps(appsync_response)}")
+        except Exception as appsync_error:
+            logger.error(f"AppSync call failed: {str(appsync_error)}", exc_info=True)
+            raise
 
         # Clean up temporary file
         os.remove(audio_path)

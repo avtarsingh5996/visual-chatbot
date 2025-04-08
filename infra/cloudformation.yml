@@ -9,7 +9,7 @@ Resources:
       Timeout: 30
       MemorySize: 1024
       Code:
-        S3Bucket: !Sub "visual-chatbot-deployment-${AWS::AccountId}"
+        S3Bucket: !Sub "visual-chatbot-deployment-${AWS::AccountId}"  # Manually created
         S3Key: lambda.zip
       Environment:
         Variables:
@@ -46,7 +46,7 @@ Resources:
 
   ApiGatewayResource:
     Type: AWS::ApiGateway::Resource
-    DependsOn: ApiGateway  # Explicit dependency to ensure ApiGateway exists
+    DependsOn: ApiGateway
     Properties:
       RestApiId: !Ref ApiGateway
       ParentId: !GetAtt ApiGateway.RootResourceId
@@ -54,7 +54,7 @@ Resources:
 
   ApiGatewayMethod:
     Type: AWS::ApiGateway::Method
-    DependsOn: ApiGatewayResource  # Ensure resource exists before method
+    DependsOn: ApiGatewayResource
     Properties:
       RestApiId: !Ref ApiGateway
       ResourceId: !Ref ApiGatewayResource
