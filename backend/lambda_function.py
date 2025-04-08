@@ -9,35 +9,27 @@ import time
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# AWS clients
-bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
-polly = boto3.client('polly', region_name='us-east-1')
-s3 = boto3.client('s3')
-dynamodb = boto3.resource('dynamodb')
-appsync = boto3.client('appsync')
+# AWS clients (region set to ap-south-1 to match your deployment)
+bedrock = boto3.client('bedrock-runtime', region_name='ap-south-1')
+polly = boto3.client('polly', region_name='ap-south-1')
+s3 = boto3.client('s3', region_name='ap-south-1')
+dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
+appsync = boto3.client('appsync', region_name='ap-south-1')
 
 # Configuration from environment variables
 BUCKET_NAME = 'visual-chatbot-audio'
 TABLE_NAME = 'ChatHistory'
-APPSYNC_API_ID_RAW = os.environ["APPSYNC_API_ID"]
+APPSYNC_API_ID_RAW = os.environ.get("APPSYNC_API_ID", "MISSING_API_ID")
 
 # Extract API ID from ARN if necessary
 if "arn:aws:appsync" in APPSYNC_API_ID_RAW:
-    APPSYNC_API_ID = APPSYNC_API_ID_RAW.split('/')[-1]  # Extract the ID from ARN
+    APPSYNC_API_ID = APPSYNC_API_ID_RAW.split('/')[-1]
 else:
     APPSYNC_API_ID = APPSYNC_API_ID_RAW
-logger.info(f"Using AppSync API ID: {APPSYNC_API_ID}")
+logger.info(f"Raw APPSYNC_API_ID from env: {APPSYNC_API_ID_RAW}")
+logger.info(f"Parsed APPSYNC_API_ID: {APPSYNC_API_ID}")
 
 def lambda_handler(event, context):
-    """
-    Lambda handler for processing chat requests.
-    - Receives user input via API Gateway.
-    - Generates a response using Bedrock (Claude).
-    - Converts response to speech with Polly.
-    - Analyzes lip sync with waveform analysis.
-    - Stores audio in S3 and logs in DynamoDB.
-    - Pushes real-time update to AppSync.
-    """
     try:
         # Parse user input from API Gateway event
         body = json.loads(event['body'])
@@ -63,7 +55,7 @@ def lambda_handler(event, context):
         polly_response = polly.synthesize_speech(
             Text=response_text,
             OutputFormat='mp3',
-            VoiceId='Joanna'  # High-quality voice
+            VoiceId='Joanna'
         )
         audio_path = '/tmp/response.mp3'
         with open(audio_path, 'wb') as f:
@@ -92,29 +84,33 @@ def lambda_handler(event, context):
         logger.info("Stored conversation in DynamoDB")
 
         # Step 6: Push real-time update to AppSync
+        mutation_query = '''
+            mutation PublishResponse($response: String!, $audioUrl: String!, $lipSync: AWSJSON!) {
+                publishResponse(response: $response, audioUrl: $audioUrl, lipSync: $lipSync) {
+                    response
+                    audioUrl
+                    lipSync
+                }
+            }
+        '''
+        variables = {
+            'response': response_text,
+            'audioUrl': audio_url,
+            'lipSync': json.dumps(lip_sync_data)
+        }
+        logger.info(f"Executing AppSync mutation with API ID: {APPSYNC_API_ID}")
+        logger.debug(f"Mutation query: {mutation_query}")
+        logger.debug(f"Variables: {variables}")
         appsync_response = appsync.graphql(
             apiId=APPSYNC_API_ID,
-            query='''
-                mutation PublishResponse($response: String!, $audioUrl: String!, $lipSync: AWSJSON!) {
-                    publishResponse(response: $response, audioUrl: $audioUrl, lipSync: $lipSync) {
-                        response
-                        audioUrl
-                        lipSync
-                    }
-                }
-            ''',
-            variables={
-                'response': response_text,
-                'audioUrl': audio_url,
-                'lipSync': json.dumps(lip_sync_data)
-            }
+            query=mutation_query,
+            variables=variables
         )
-        logger.info(f"Pushed response to AppSync: {appsync_response}")
+        logger.info(f"AppSync response: {appsync_response}")
 
         # Clean up temporary file
         os.remove(audio_path)
 
-        # Return success response to API Gateway
         return {
             'statusCode': 200,
             'body': json.dumps({'message': 'Processing complete'})
@@ -128,10 +124,7 @@ def lambda_handler(event, context):
         }
 
 if __name__ == "__main__":
-    # For local testing (mock event and context)
-    os.environ["APPSYNC_API_ID"] = "test-api-id"  # Set manually for local testing
-    mock_event = {
-        'body': json.dumps({'message': 'Hello, how are you?'})
-    }
+    os.environ["APPSYNC_API_ID"] = "test-api-id"
+    mock_event = {'body': json.dumps({'message': 'Hello, how are you?'})}
     mock_context = type('MockContext', (), {'aws_request_id': 'test-id'})()
     print(lambda_handler(mock_event, mock_context))
